@@ -2,76 +2,234 @@
 #include "laswriter.hpp"
 #include <string>
 #include <array>
-using namespace std;
 
-class LAS_Writer
+struct sRGBA
 {
-public:
-	LAS_Writer()
-	{
-		m_header.x_offset = m_header.y_offset = m_header.z_offset = 0.001;
+	unsigned char r;
+	unsigned char g;
+	unsigned char b;
+	unsigned char a;
 
-		m_p.init(&m_header, m_header.point_data_format, m_header.point_data_record_length);
-
-	};
-
-	~LAS_Writer() {};
-
-	bool open(const string& str_las, array<double, 3> scales = { 0.001,0.001,0.001 }, array<double, 3> offsets = {0,0,0})
-	{
-		m_header.x_offset = offsets[0];
-		m_header.y_offset = offsets[1];
-		m_header.z_offset = offsets[2];
-
-		m_header.x_scale_factor = scales[0];
-		m_header.y_scale_factor = scales[1];
-		m_header.z_scale_factor = scales[2];
-
-		m_p.init(&m_header, m_header.point_data_format, m_header.point_data_record_length);
-
-
-		m_las_opener.set_file_name(str_las.data());
-
-		m_las_writer =  m_las_opener.open(&m_header);
-		if (m_las_writer == nullptr)
-		{
-			return false;
-		}
-
-		return true;
+	sRGBA()
+	{ 
+		r = g = b = 0;
+		a = 255; 
 	}
 
-	bool write_point(double x, double y, double z )
+	sRGBA(unsigned char r_, unsigned char g_, unsigned char b_)
 	{
-		if (m_las_writer == nullptr)
-			return false;
+		r = r_; g = g_; b = b_;
+		a = 255;
+	}
 
-		m_p.set_x(x);
-		m_p.set_y(y);
-		m_p.set_z(z);
+	sRGBA(unsigned char r_, unsigned char g_, unsigned char b_, unsigned char a_)
+	{
+		r = r_; g = g_; b = b_; a = a_;
+	}
+};
 
-		if (m_las_writer->write_point(&m_p) == FALSE)
-			return false;
+class Las_Writer
+{
+public:
 
-		return true;
+	Las_Writer()
+	{
+		m_laswriter = nullptr;
+	}
+
+	~Las_Writer()
+	{
+		close();
+	}
+
+	bool open(const std::string& str_las_file, std::array<double, 3> offset = {0,0,0})
+	{
+		m_laswrite_opener.set_file_name(str_las_file.data());
+		// init header	
+		m_lasheader.x_scale_factor = 0.0001;
+		m_lasheader.y_scale_factor = 0.0001;
+		m_lasheader.z_scale_factor = 0.0001;
+
+		m_lasheader.x_offset = offset[0];
+		m_lasheader.y_offset = offset[1];
+		m_lasheader.z_offset = offset[2];
+
+		//m_lasheader.point_data_format = 1;
+		//m_lasheader.point_data_record_length = 28;
+		m_lasheader.point_data_format = 3;
+		m_lasheader.point_data_record_length = 34;
+
+		// init point 	
+		m_laspoint.init(&m_lasheader, m_lasheader.point_data_format, m_lasheader.point_data_record_length, 0);
+
+		// open laswriter
+		m_laswriter = m_laswrite_opener.open(&m_lasheader);
+
+		return (m_laswriter != nullptr);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, double time, unsigned short intensity, unsigned char wave_num, unsigned  char wave_count)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_intensity(intensity);
+		m_laspoint.set_gps_time(time);
+
+		m_laspoint.set_return_number(wave_num);
+		m_laspoint.set_number_of_returns(wave_count);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, double time, unsigned short intensity)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_intensity(intensity);
+		m_laspoint.set_gps_time(time);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, double time, unsigned short intensity, unsigned short source_id)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_intensity(intensity);
+		m_laspoint.set_gps_time(time);
+
+		m_laspoint.set_point_source_ID(source_id);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, unsigned short intensity)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_intensity(intensity);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, unsigned short intensity, sRGBA color)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_R(color.r);
+		m_laspoint.set_G(color.g);
+		m_laspoint.set_B(color.b);
+		m_laspoint.set_I(color.a);
+
+		m_laspoint.set_intensity(intensity);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, sRGBA color)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_R(color.r);
+		m_laspoint.set_G(color.g);
+		m_laspoint.set_B(color.b);
+		m_laspoint.set_I(color.a);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, double time, unsigned  short intensity, sRGBA color)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_R(color.r);
+		m_laspoint.set_G(color.g);
+		m_laspoint.set_B(color.b);
+		m_laspoint.set_I(color.a);
+
+		m_laspoint.set_gps_time(time);
+		m_laspoint.set_intensity(intensity);
+
+		m_laswriter->write_point(&m_laspoint);
+	}
+
+	void write_point(double bigX, double bigY, double bigZ, unsigned char class_id, unsigned char return_number)
+	{
+		I32 x = I32(1.0 / m_lasheader.x_scale_factor * (bigX - m_lasheader.x_offset));
+		I32 y = I32(1.0 / m_lasheader.y_scale_factor * (bigY - m_lasheader.y_offset));
+		I32 z = I32(1.0 / m_lasheader.z_scale_factor * (bigZ - m_lasheader.z_offset));
+		m_laspoint.set_X(x);
+		m_laspoint.set_Y(y);
+		m_laspoint.set_Z(z);
+
+		m_laspoint.set_classification(class_id);
+		m_laspoint.set_return_number(return_number);
+
+		m_laswriter->write_point(&m_laspoint);
 	}
 
 	void close()
-	{		
-		if (m_las_writer)
+	{
+		if (m_laswriter)
 		{
-			m_las_writer->update_header(&m_header, FALSE, TRUE);
-
-			m_las_writer->close();
-			delete m_las_writer;
-			m_las_writer = nullptr;
+			m_laswriter->update_header(&m_lasheader, TRUE);// update the header
+			I64 total_bytes = m_laswriter->close();
+			delete m_laswriter;
+			m_laswriter = nullptr;
 		}
-	}
+	}	
 
-private:
-	LASwriteOpener m_las_opener;
-	LASwriter* m_las_writer = nullptr;
-	LASheader m_header;
-	LASpoint m_p;
-
+protected:
+	LASwriteOpener m_laswrite_opener;
+	LASheader m_lasheader;
+	LASpoint m_laspoint;
+	LASwriter* m_laswriter;
 };
+
