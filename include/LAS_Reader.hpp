@@ -3,88 +3,107 @@
 #include <string>
 #include <array>
 
-using namespace std;
-
-class LAS_Reader
+class Las_Reader
 {
 public:
-	LAS_Reader()
-	{
-	};
 
-	~LAS_Reader() {};
-
-	bool open(const string& str_las)
+	Las_Reader()
 	{
-		m_las_reader = m_las_opener.open(str_las.data());
-		if (m_las_reader == nullptr)
-		{
+		m_lasreader = nullptr;
+	}
+
+	~Las_Reader()
+	{
+		close();
+	}
+
+	bool open(const std::string& str_las_file)
+	{
+		m_lasread_opener.set_file_name(str_las_file.data());
+		m_lasread_opener.set_decompress_selective(1);
+		// open lasreader
+		m_lasreader = m_lasread_opener.open();
+
+		return (m_lasreader != nullptr);
+	}
+
+	int64_t point_count()
+	{
+		if (m_lasreader != nullptr)
+			return m_lasreader->npoints;
+		else
+			return 0;
+	}
+
+	bool read_point(double& X, double& Y, double& Z)
+	{
+		if (m_lasreader->read_point() == FALSE)
 			return false;
-		}
 
-		m_point_count = m_las_reader->npoints;
+		X = m_lasreader->point.get_x();
+		Y = m_lasreader->point.get_y();
+		Z = m_lasreader->point.get_z();
+
 		return true;
 	}
 
-	uint64_t get_point_count()
+	bool read_point(double& X, double& Y, double& Z, double& time, unsigned short& intensity)
 	{
-		return m_point_count;
-	}
-
-	array<double, 3> get_scales()
-	{
-		array<double, 3> scales = {1,1,1};
-		if (m_las_reader != nullptr)
-		{
-			scales[0] = m_las_reader->header.x_scale_factor;
-			scales[1] = m_las_reader->header.y_scale_factor;
-			scales[2] = m_las_reader->header.z_scale_factor;
-		}
-
-		return scales;
-	}
-
-	array<double, 3> get_offsets()
-	{
-		array<double, 3> offsets = { 0,0,0 };
-		if (m_las_reader != nullptr)
-		{
-			offsets[0] = m_las_reader->header.x_offset;
-			offsets[1] = m_las_reader->header.y_offset;
-			offsets[2] = m_las_reader->header.z_offset;
-		}
-
-		return offsets;
-	}
-
-	bool read_point(double& x, double& y, double& z )
-	{
-		if (m_las_reader == nullptr)
+		if (m_lasreader->read_point() == FALSE)
 			return false;
 
-		if (m_las_reader->read_point() == FALSE)
+		X = m_lasreader->point.get_x();
+		Y = m_lasreader->point.get_y();
+		Z = m_lasreader->point.get_z();
+		time = m_lasreader->point.get_gps_time();
+		intensity = m_lasreader->point.get_intensity();
+
+		return true;
+	}
+
+	bool read_point(double& X, double& Y, double& Z, unsigned short& intensity)
+	{
+		if (m_lasreader->read_point() == FALSE)
 			return false;
 
-		x = m_las_reader->get_x();
-		y = m_las_reader->get_y();
-		z = m_las_reader->get_z();
+		X = m_lasreader->point.get_x();
+		Y = m_lasreader->point.get_y();
+		Z = m_lasreader->point.get_z();
 
+		intensity = m_lasreader->point.get_intensity();
+
+		return true;
+	}
+
+	bool read_point(double& X, double& Y, double& Z, double& time, unsigned short& intensity, unsigned short& Red, unsigned short& Green, unsigned short &Blue)
+	{
+		if (m_lasreader->read_point() == FALSE)
+			return false;
+
+		X = m_lasreader->point.get_x();
+		Y = m_lasreader->point.get_y();
+		Z = m_lasreader->point.get_z();
+		time = m_lasreader->point.get_gps_time();
+		intensity = m_lasreader->point.get_intensity();
+		Red = m_lasreader->point.get_R();
+		Green = m_lasreader->point.get_B();
+		Blue = m_lasreader->point.get_B();
 		return true;
 	}
 
 	void close()
-	{
-		m_las_opener.reset();
-		if (m_las_reader)
+	{		
+		if (m_lasreader)
 		{
-			m_las_reader->close();
-			delete m_las_reader;
-			m_las_reader = nullptr;
+			m_lasreader->close();
+			delete m_lasreader;
+			m_lasreader = nullptr;
 		}
-	}
+	}	
 
-private:
-	LASreadOpener m_las_opener;
-	LASreader* m_las_reader = nullptr;
-	uint64_t m_point_count = 0;
+protected:
+	LASreadOpener m_lasread_opener;
+	LASheader m_lasheader;
+	LASpoint m_laspoint;
+	LASreader* m_lasreader;
 };
