@@ -1,2 +1,3 @@
 # LASReaderWriter
-LAS file Reader and Writer base on LASlib
+LAS file Reader and Writer base on LAStools 
+https://github.com/LAStools/LAStools
